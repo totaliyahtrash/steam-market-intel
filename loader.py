@@ -1,29 +1,30 @@
+import logging
 import pandas as pd
 
-import logging
-
-loader = logging.getLogger('loader')
+loader = logging.getLogger("loader")
 
 
 def load_dimensions(df, engine):
     existing = pd.read_sql("SELECT COUNT(*) as cnt FROM dim_developer", engine)
-    if existing['cnt'][0] > 0:
+    if existing["cnt"][0] > 0:
         loader.info("Tables already loaded, skipping...")
         return
 
-    dim_developer = df[['developer']].drop_duplicates()
-    dim_developer.columns = ['developer_name']
+    dim_developer = df[["developer"]].drop_duplicates()
+    dim_developer.columns = ["developer_name"]
 
-    dim_release = df[['release_date']].drop_duplicates()
-    dim_release['release_year'] = dim_release['release_date'].dt.year
-    dim_release['release_month'] = dim_release['release_date'].dt.month
+    dim_release = df[["release_date"]].drop_duplicates()
+    dim_release["release_year"] = dim_release["release_date"].dt.year
+    dim_release["release_month"] = dim_release["release_date"].dt.month
 
-    dim_genre = df[['genres']].drop_duplicates()
-    dim_genre.columns = ['genre_name']
+    dim_genre = df[["genres"]].drop_duplicates()
+    dim_genre.columns = ["genre_name"]
 
-    dim_developer.to_sql('dim_developer', engine, if_exists='append', index=False)
-    dim_genre.to_sql('dim_genre', engine, if_exists='append', index=False)
-    dim_release.to_sql('dim_release', engine, if_exists='append', index=False)
+    dim_developer.to_sql(
+        "dim_developer", engine, if_exists="append", index=False
+    )
+    dim_genre.to_sql("dim_genre", engine, if_exists="append", index=False)
+    dim_release.to_sql("dim_release", engine, if_exists="append", index=False)
 
     loader.debug(f"Loaded {len(dim_developer)} developers")
     loader.debug(f"Loaded {len(dim_release)} releases")
@@ -31,28 +32,76 @@ def load_dimensions(df, engine):
 
 
 def load_fact(df, engine):
-    existing_ids = pd.read_sql("SELECT appid FROM fact_games", engine)['appid'].tolist()
+    latest_db_release = pd.read_sql(
+        "SELECT MAX(release_date) as max_date FROM dim_release", engine
+    )
+    watermark = latest_db_release["max_date"][0]
 
-    df_new = df[~df['appid'].isin(existing_ids)]
+    if watermark is not None:
+        watermark = pd.to_datetime(watermark)
+        df_new = df[df["release_date"] >= watermark]
+
+        existing_ids = pd.read_sql("SELECT appid FROM fact_games", engine)
+        if not existing_ids.empty:
+            df_new = df_new[~df_new["appid"].isin(existing_ids["appid"])]
+
+        loader.info(f"Watermark: {watermark}")
+        loader.info(f"New records after filter: {len(df_new)}")
+    else:
+        df_new = df.copy()
 
     if df_new.empty:
         loader.info("No new game records to insert into fact_games.")
         return
 
-    dim_dev_db = pd.read_sql("SELECT developer_id, developer_name FROM dim_developer", engine)
-    merged_df = pd.merge(df_new, dim_dev_db, left_on='developer', right_on='developer_name', how='left')
+    dim_dev_db = pd.read_sql(
+        "SELECT developer_id, developer_name FROM dim_developer", engine
+    )
+    merged_df = pd.merge(
+        df_new,
+        dim_dev_db,
+        left_on="developer",
+        right_on="developer_name",
+        how="left",
+    )
 
-    dim_genre_db = pd.read_sql("SELECT genre_id, genre_name FROM dim_genre", engine)
-    merged_df = pd.merge(merged_df, dim_genre_db, left_on='genres', right_on='genre_name', how='left')
+    dim_genre_db = pd.read_sql(
+        "SELECT genre_id, genre_name FROM dim_genre", engine
+    )
+    merged_df = pd.merge(
+        merged_df,
+        dim_genre_db,
+        left_on="genres",
+        right_on="genre_name",
+        how="left",
+    )
 
-    dim_release_db = pd.read_sql("SELECT release_id, release_date FROM dim_release", engine)
-    dim_release_db['release_date'] = pd.to_datetime(dim_release_db['release_date'])
-    merged_df = pd.merge(merged_df, dim_release_db, left_on='release_date', right_on='release_date', how='left')
+    dim_release_db = pd.read_sql(
+        "SELECT release_id, release_date FROM dim_release", engine
+    )
+    dim_release_db["release_date"] = pd.to_datetime(
+        dim_release_db["release_date"]
+    )
+    merged_df = pd.merge(
+        merged_df,
+        dim_release_db,
+        left_on="release_date",
+        right_on="release_date",
+        how="left",
+    )
 
-    columns_to_drop = ['developer', 'developer_name', 'genres', 'genre_name', 'release_date', 'publisher']
-    fact_games = merged_df.drop(columns=columns_to_drop, errors='ignore')
+    columns_to_drop = [
+        "developer",
+        "developer_name",
+        "genres",
+        "genre_name",
+        "release_date",
+        "publisher",
+    ]
+    fact_games = merged_df.drop(columns=columns_to_drop, errors="ignore")
 
-    fact_games.to_sql('fact_games', engine, if_exists='append', index=False)
-    loader.info(f"Successfully loaded {len(fact_games)} new records into fact_games!")
+    fact_games.to_sql("fact_games", engine, if_exists="append", index=False)
+    loader.info(
+        f"Successfully loaded {len(fact_games)} new records into fact_games!"
+    )
     loader.info(f"Fact Table Columns: {fact_games.columns.tolist()}")
-

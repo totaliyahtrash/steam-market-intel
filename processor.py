@@ -12,11 +12,11 @@ def filter_data(df):
         df_clean = df_clean.dropna()
 
         if 'release_date' in df_clean.columns:
-            df_clean['release_date'] = pd.to_datetime(df_clean['release_date'])
+            df_clean['release_date'] = pd.to_datetime(df_clean['release_date'], format='mixed')
 
         df_clean['rating_ratio'] = df_clean['positive_ratings']/(df_clean['positive_ratings']+df_clean['negative_ratings'])
         return df_clean
 
 
     except Exception as e:
-        process.error('unexpected error occurred')
+        process.error(f'unexpected error occurred: {e}')
