@@ -3,14 +3,6 @@ import pandas as pd
 
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-    handlers = [
-        logging.FileHandler('pipeline.logs'),
-        logging.StreamHandler()
-    ]
-)
 
 extract = logging.getLogger('extractor')
 

@@ -1,32 +1,9 @@
-from sqlalchemy import create_engine
 import pandas as pd
-from extractor import extractor
-from processor import filter_data
-import psycopg2
-from schema import schema_design
 
 import logging
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-    handlers = [
-        logging.FileHandler('pipeline.logs'),
-        logging.StreamHandler()
-    ]
-)
-
 loader = logging.getLogger('loader')
 
-engine = create_engine('postgresql+psycopg2://postgres:dhruv@localhost:5432/postgres')
-df = filter_data(extractor())
-
-conn = psycopg2.connect(
-    host='localhost', port=5432,
-    database='postgres', user='postgres', password='dhruv'
-)
-schema_design(conn)
-conn.close()
 
 def load_dimensions(df, engine):
     existing = pd.read_sql("SELECT COUNT(*) as cnt FROM dim_developer", engine)
@@ -52,9 +29,18 @@ def load_dimensions(df, engine):
     loader.debug(f"Loaded {len(dim_release)} releases")
     loader.debug(f"Loaded {len(dim_genre)} genres\n")
 
+
 def load_fact(df, engine):
+    existing_ids = pd.read_sql("SELECT appid FROM fact_games", engine)['appid'].tolist()
+
+    df_new = df[~df['appid'].isin(existing_ids)]
+
+    if df_new.empty:
+        loader.info("No new game records to insert into fact_games.")
+        return
+
     dim_dev_db = pd.read_sql("SELECT developer_id, developer_name FROM dim_developer", engine)
-    merged_df = pd.merge(df, dim_dev_db, left_on='developer', right_on='developer_name', how='left')
+    merged_df = pd.merge(df_new, dim_dev_db, left_on='developer', right_on='developer_name', how='left')
 
     dim_genre_db = pd.read_sql("SELECT genre_id, genre_name FROM dim_genre", engine)
     merged_df = pd.merge(merged_df, dim_genre_db, left_on='genres', right_on='genre_name', how='left')
@@ -67,6 +53,6 @@ def load_fact(df, engine):
     fact_games = merged_df.drop(columns=columns_to_drop, errors='ignore')
 
     fact_games.to_sql('fact_games', engine, if_exists='append', index=False)
-    loader.info(f"Successfully loaded {len(fact_games)} records into fact_games!")
+    loader.info(f"Successfully loaded {len(fact_games)} new records into fact_games!")
     loader.info(f"Fact Table Columns: {fact_games.columns.tolist()}")
 
