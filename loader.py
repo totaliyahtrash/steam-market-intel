@@ -5,6 +5,19 @@ from processor import filter_data
 import psycopg2
 from schema import schema_design
 
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    handlers = [
+        logging.FileHandler('pipeline.logs'),
+        logging.StreamHandler()
+    ]
+)
+
+loader = logging.getLogger('loader')
+
 engine = create_engine('postgresql+psycopg2://postgres:dhruv@localhost:5432/postgres')
 df = filter_data(extractor())
 
@@ -18,7 +31,7 @@ conn.close()
 def load_dimensions(df, engine):
     existing = pd.read_sql("SELECT COUNT(*) as cnt FROM dim_developer", engine)
     if existing['cnt'][0] > 0:
-        print("Tables already loaded, skipping...")
+        loader.info("Tables already loaded, skipping...")
         return
 
     dim_developer = df[['developer']].drop_duplicates()
@@ -35,9 +48,9 @@ def load_dimensions(df, engine):
     dim_genre.to_sql('dim_genre', engine, if_exists='append', index=False)
     dim_release.to_sql('dim_release', engine, if_exists='append', index=False)
 
-    print(f"Loaded {len(dim_developer)} developers")
-    print(f"Loaded {len(dim_release)} releases")
-    print(f"Loaded {len(dim_genre)} genres\n")
+    loader.debug(f"Loaded {len(dim_developer)} developers")
+    loader.debug(f"Loaded {len(dim_release)} releases")
+    loader.debug(f"Loaded {len(dim_genre)} genres\n")
 
 def load_fact(df, engine):
     dim_dev_db = pd.read_sql("SELECT developer_id, developer_name FROM dim_developer", engine)
@@ -54,8 +67,6 @@ def load_fact(df, engine):
     fact_games = merged_df.drop(columns=columns_to_drop, errors='ignore')
 
     fact_games.to_sql('fact_games', engine, if_exists='append', index=False)
-    print(f"Successfully loaded {len(fact_games)} records into fact_games!")
-    print("Fact Table Columns:", fact_games.columns.tolist())
+    loader.info(f"Successfully loaded {len(fact_games)} records into fact_games!")
+    loader.info(f"Fact Table Columns: {fact_games.columns.tolist()}")
 
-load_dimensions(df, engine)
-load_fact(df, engine)

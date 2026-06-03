@@ -5,3 +5,5 @@ __pycache__/
 raw.json
 steam.csv
 .idea/
+config.yaml
+*.logs

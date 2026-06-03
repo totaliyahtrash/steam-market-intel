@@ -1,5 +1,18 @@
 import pandas as pd
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    handlers = [
+        logging.FileHandler('pipeline.logs'),
+        logging.StreamHandler()
+    ]
+)
+
+process = logging.getLogger('processor')
+
 def filter_data(df):
     try:
         useless = ['english', 'required_age', 'steamspy_tags', 'median_playtime', 'platforms', 'categories']
@@ -15,4 +28,4 @@ def filter_data(df):
 
 
     except Exception as e:
-        print('Error occurred while cleaning')
+        process.error('unexpected error occurred')

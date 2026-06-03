@@ -1,25 +1,56 @@
 import psycopg2
 from sqlalchemy import create_engine
+
 from extractor import extractor
 from processor import filter_data
 from schema import schema_design
 from loader import load_dimensions, load_fact
 
-DATABASE_URL = 'postgresql+psycopg2://postgres:dhruv@localhost:5432/postgres'
+import yaml
+from dotenv import load_dotenv
+import os
+
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    handlers = [
+        logging.FileHandler('pipeline.logs'),
+        logging.StreamHandler()
+    ]
+)
+
+
+main1 = logging.getLogger('main')
+
+with open('config.yaml','r') as f:
+    configuration = yaml.safe_load(f)
+    db = configuration['database']
+    port = db['port']
+    host = db['host']
+    user = db['user']
+    name = db['name']
+
+load_dotenv()
+password = os.getenv('DB_PASSWORD')
+
+DATABASE_URL = f'postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}'
 
 DB_PARAMS = {
-    'host': 'localhost',
-    'port': 5432,
-    'database': 'postgres',
-    'user': 'postgres',
-    'password': 'dhruv'
+    'host': host,
+    'port': port,
+    'database': name,
+    'user': user,
+    'password': password
 }
 
 def main():
-    conn = psycopg2.connect(**DB_PARAMS)
+
     engine = create_engine(DATABASE_URL)
 
     try:
+        conn = psycopg2.connect(**DB_PARAMS)
         schema_design(conn)
         conn.close()
 
@@ -29,10 +60,10 @@ def main():
         load_dimensions(processed_df, engine)
         load_fact(processed_df, engine)
 
-        print("Pipeline completed successfully.")
+        main1.info('pipeline successful')
 
     except Exception as e:
-        print(f"Pipeline failed: {e}")
+        main1.exception(f'Pipeline Failed: {e}')
 
 if __name__ == '__main__':
     main()
