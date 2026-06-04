@@ -1,5 +1,4 @@
 import pandas as pd
-
 import logging
 
 process = logging.getLogger('processor')

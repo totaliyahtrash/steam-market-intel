@@ -1,15 +1,12 @@
 import psycopg2
 from sqlalchemy import create_engine
-
 from extractor import extractor
 from processor import filter_data
 from schema import schema_design
 from loader import load_dimensions, load_fact
-
 import yaml
 from dotenv import load_dotenv
 import os
-
 import logging
 from checkpoint import save_checkpoint, load_checkpoint
 from retry import with_retry
