@@ -92,4 +92,4 @@ python main.py
 
 ## Author
 
-Dhruv — [github.com/syntaxdsamurai](https://github.com/syntaxdsamurai)
+Dhruv — [github.com/syntaxdsamurai](https://github.com/totaliyahtrash)
