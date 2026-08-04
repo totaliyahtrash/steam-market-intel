@@ -6,7 +6,7 @@ An end-to-end data engineering pipeline that processes 27,000+ Steam game record
 
 - Ingests raw Steam game data (27,061 records)
 - Cleans and transforms using Pandas — null handling, dtype fixing, feature engineering
-- Designs and creates a star schema in PostgreSQL using psycopg2
+- Designs and creates a star schema in PostgreSQL using psycopg2 
 - Loads dimension and fact tables using SQLAlchemy
 - Supports idempotent runs — safe to execute multiple times without duplicate data
 - Incremental loading — watermark-based, only processes new records on each run
